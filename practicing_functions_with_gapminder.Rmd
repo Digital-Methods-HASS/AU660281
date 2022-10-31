@@ -1,0 +1,89 @@
+---
+title: "practicing_functions_with_gapminder"
+output: html_document
+date: "2022-10-29"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Installing neccecery libarys 
+```{r libraries, echo = TRUE}
+library(tidyverse)
+library(av)
+library(gapminder)
+library(ggplot2)
+```
+# Looking at the Data
+```{r eval=TRUE}
+
+str(gapminder)
+unique(gapminder$year)
+head(gapminder)
+```
+# Question one 
+Define a defensive function that calculates the Gross Domestic Product of a nation from the data available in the gapminder dataset. You can use the population and GDPpercapita columns for it. Using that function, calculate the GDP of Denmark in the following years: 1967, 1977, 1987, 1997, 2007, and 2017.
+
+```{r}
+
+danishGDP <- function(gapminder, year=NULL, country=NULL) { #function to be in variable danishGDP. Year and country to be empty.
+  if(!is.null(year)){
+    gapminder <- gapminder[gapminder$year %in% year, ]
+  } #using a defensive function to say that if year is not empty take that input and supset year. %in% is used to say take that 
+  #variable from that column.
+  if (!is.null(country)) {
+    gapminder <- gapminder[gapminder$country %in% country, ]
+  
+    } # if !is.null is another way of defining a defensive function.
+  
+  gdp <- gapminder$pop * gapminder$gdpPercap #calculation to find countrys GDP
+  
+  
+  newDataSet <- cbind(gapminder, gdp=gdp) # create a new dataset with new information from the function
+  
+  return(newDataSet) #return the last statement in this case newDataSet
+}
+
+```
+
+```{r eval=TRUE}
+
+
+dataset <- danishGDP(gapminder, year= c(1967,1977,1987,1997,2007,2017), country = "Denmark") #selecting the years and the country to be
+#shown
+select(dataset, country, year, gdp) #select function from Tidyverse to only show specific columns
+  
+
+```
+
+# Question two
+Write a script that loops over each country in the gapminder dataset, tests whether the country starts with a ‘B’ , and prints out whether the life expectancy is smaller than 50, between 50 and 70, or greater than 70.
+
+
+```{r echo=TRUE}
+gapminder <- read.csv("data/gapminder_data.csv")
+
+
+countryStartsWithB <- grep("^B", unique(gapminder$country), value= TRUE) #Finds countrys starting with B and puts them in the variable
+
+
+for (countryB in countryStartsWithB) {
+  tmp <- mean(gapminder[gapminder$country == countryB, "lifeExp"]) # calculates the mean lifeExp in gapminder dataset for all countrys
+  # that are the same value as in the variable countryStartsWithB
+
+  
+  if (tmp < 50) {
+    cat("Average life expectancy in", countryB, "is under 50", "\n") # if statement to see in lifeExp is under 5 if yes move on to next
+    #country 
+  
+  } else if (tmp >= 50 && tmp < 70){
+    cat("Average life expectancy in", countryB, "is between 50 & 70", "\n")
+  } else {
+    cat("Average life expectancy is 70 or over in", countryB, "\n")
+  }
+
+}
+
+```
+
