@@ -1,0 +1,87 @@
+---
+title: "PracticeWebScraping"
+output: html_document
+date: "2022-11-06"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+### Installing packages
+```{r libraries, warning=FALSE, message=FALSE}
+library(rvest)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(janitor)
+library(usmap)
+library(ggplot2)
+```
+
+
+## Question 3) 
+Produce data visualisations that shed light on another interesting aspect of the police killing data
+
+```{r echo=TRUE}
+#Getting the csv of scraped and cleaned data from GitHub
+policeKillings <- read.csv("WebscrapingPoliceKillings/data/policekillings202210.csv") 
+#Checking to see if the dataframe is correct
+head(policeKillings)
+```
+```{r echo=TRUE}
+# Extracting year from column Date and make a new column called Year.
+policeKillings$Date <- as.Date(policeKillings$Date)
+policeKillings$Year <- as.numeric(format(policeKillings$Date, "%Y"))
+head(policeKillings)
+```
+
+
+
+
+```{r}
+policeKillings["Regions"] <- " " #Creating a new column
+
+
+#If statements that go through each row in column 6 (states). if match is found, a region is entered
+for (i in 6 : nrow(policeKillings)) {
+  if (policeKillings$State[i] == "WA"|| policeKillings$State[i] == "OR"|| policeKillings$State[i] == "CA"|| policeKillings$State[i] == "NV"|| policeKillings$State[i] == "ID"|| policeKillings$State[i] == "MT"|| policeKillings$State[i] == "WY"|| policeKillings$State[i] == "UT"|| policeKillings$State[i] == "AZ"|| policeKillings$State[i] == "NM"|| policeKillings$State[i] == "CO" || policeKillings$State[i] == "AK"|| policeKillings$State[i] == "HI") {
+    policeKillings[i, "Regions"] <- "West"
+  } else if (policeKillings$State[i] == "ND"|| policeKillings$State[i] == "MN"|| policeKillings$State[i] == "SD"|| policeKillings$State[i] == "IA"|| policeKillings$State[i] == "NE"|| policeKillings$State[i] == "KS"|| policeKillings$State[i] == "MO"|| policeKillings$State[i] == "WI"|| policeKillings$State[i] == "IL"|| policeKillings$State[i] == "MI"|| policeKillings$State[i] == "IN"|| policeKillings$State[i] == "OH") {
+    policeKillings[i, "Regions"] <- "midWest"
+  } else if (policeKillings$State[i] == "ME"|| policeKillings$State[i] == "NH"|| policeKillings$State[i] == "VT"|| policeKillings$State[i] == "MA"|| policeKillings$State[i] == "CT"|| policeKillings$State[i] == "RI"|| policeKillings$State[i] == "NY"|| policeKillings$State[i] == "NJ"|| policeKillings$State[i] == "PA") {
+    policeKillings[i, "Regions"] <- "northEast"
+  } else if (policeKillings$State[i] == "DE"|| policeKillings$State[i] == "MD"|| policeKillings$State[i] == "DC"|| policeKillings$State[i] == "VA"|| policeKillings$State[i] == "WV"|| policeKillings$State[i] == "KY"|| policeKillings$State[i] == "TN"|| policeKillings$State[i] == "SC"|| policeKillings$State[i] == "GA"|| policeKillings$State[i] == "FL"|| policeKillings$State[i] == "AL"|| policeKillings$State[i] == "MS"|| policeKillings$State[i] == "LA"|| policeKillings$State[i] == "AR"|| policeKillings$State[i] == "OK"|| policeKillings$State[i] == "TX"|| policeKillings$State[i] == "NC") {
+    policeKillings[i, "Regions"] <- "south"
+}
+}
+
+```
+
+```{r}
+# Create age groups and mutating them into a new column in the Dataframe 
+policeKillings <- policeKillings %>% 
+  mutate(
+    # Create categories
+    age_group = dplyr::case_when(
+      Age <= 14            ~ "0-14",
+      Age > 14 & Age <= 44 ~ "15-44",
+      Age > 44 & Age <= 64 ~ "45-64",
+      Age > 64             ~ "> 64"
+    ),
+    age_group = factor(
+      age_group,
+      level = c("0-14", "15-44","45-64", "> 64")
+    )
+  )
+```
+
+
+```{r echo=TRUE}
+# This Jitter plot shows three things: Years, Regions, and Age groups of the police killings.
+ggplot(policeKillings, aes(x=Regions, y=Year, colour = age_group)) +
+  geom_jitter(na.rm=TRUE)
+```
+
