@@ -1,0 +1,150 @@
+---
+title: "SentimentanalysisGoT"
+output: html_document
+date: "2022-11-13"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Task three   
+## My solution on line 122   
+### The first 121 lines are from the example in class. but with GoT data  
+Consider the sentiment in the Game of Thrones 
+
+```{r, , echo = FALSE}
+library(tidyverse)
+library(forcats)
+library(here)
+library(pdftools)
+library(tidytext)
+library(textdata) 
+library(ggwordcloud)
+```
+# Getting the document
+```{r}
+#Using the function here to locate the pdf
+got_path <- here("SentimentAnalysis", "data", "got.pdf")
+#Use tool pdf_text to extract the text from the pfd
+got_text <- pdf_text(got_path)
+```
+
+
+# Splitting the text to new lines, unnesting the lines, and removing whitespaces 
+
+```{r}
+got_df <- data.frame(got_text) %>% 
+  mutate(text_full = str_split(got_text, pattern = '\\n')) %>% 
+  unnest(text_full) %>% 
+  mutate(text_full = str_trim(got_text)) 
+```
+
+
+# Get the tokens (individual words) in tidy format
+
+Using toll unnest_tokens to get each word from each column, by using token word
+
+```{r tokenize}
+got_tokens <- got_df %>% 
+  unnest_tokens(word, text_full)
+
+
+```
+
+# Counting the words
+```{r count-words}
+got_wc <- got_tokens %>% 
+  count(word) %>% 
+  arrange(-n)
+got_wc
+```
+
+
+# Removing stop words:
+
+
+```{r stopwords}
+got_stop <- got_tokens %>% 
+  anti_join(stop_words) %>% 
+  select(-got_text) #By adding the minus, we remove the selected words, and make a new vairable only with the words we want
+```
+
+## Counting each word without stopwords
+```{r count-words2}
+got_swc <- got_stop %>% 
+  count(word) %>% 
+  arrange(-n)
+got_swc
+```
+
+# Removing numbers by converting dataframe to numeric, and removing each true. 
+```{r skip-numbers}
+# This code will filter out numbers by asking:
+# If you convert to as.numeric, is it NA (meaning those words)?
+# If it IS NA (is.na), then keep it (so all words are kept)
+# Anything that is converted to a number is removed
+
+got_no_numeric <- got_stop %>% 
+  filter(is.na(as.numeric(word)))
+```
+
+# Creating a word cloud of the top 100 words
+
+
+
+```{r wordcloud-prep}
+# There are 11,209 unique words
+length(unique(got_no_numeric$word))
+
+# We probably don't want to include them all in a word cloud. Let's filter to only include the top 100 most frequent?
+got_top100 <- got_no_numeric %>% 
+  count(word) %>% 
+  arrange(-n) %>% 
+  head(100)
+```
+
+```{r wordcloud}
+ggplot(data = got_top100, aes(label = word, size = n)) +
+  geom_text_wordcloud_area(aes(color = n), shape = "diamond") +
+  scale_size_area(max_size = 12) +
+  scale_color_gradientn(colors = c("darkgreen","blue","red")) +
+  theme_minimal()
+```
+# Sentiment analysis with afinn: 
+
+First, bind words in `ipcc_stop` to `afinn` lexicon:
+```{r bind-afinn}
+got_afinn <- got_stop %>% 
+  inner_join(get_sentiments("afinn"))
+```
+
+# My visualisation.
+I started by counting the words and filtering so only words that are used 3000 times or more will be visualized. 
+After i plotted using geom_col(), and ordering the words are appearance. 
+I used fill to show which sentiment the words have. 
+It appears that more negative words are used more than positive words.
+
+```{r, eval=TRUE}
+# counting and filtering words 
+plotData = got_afinn %>%
+   count(word, sort = TRUE) %>%
+  filter(n > 3000)
+
+# finding senitment of the filtered words
+plotDataSenti <- plotData %>% 
+  inner_join(get_sentiments("afinn"))
+
+# plotting
+ggplot(plotDataSenti, aes(x = n, y = fct_reorder(word, n), fill = value))+
+  geom_col() 
+```
+
+
+# Question
+How come my most used words are different than the most used words below? 
+Is it because those words don't have a sentiment score? 
+
+```{r, eval=TRUE}
+got_top100
+```
