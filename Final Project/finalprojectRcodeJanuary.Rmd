@@ -1,0 +1,378 @@
+---
+title: "CovidFinalProject"
+output: html_document
+date: "2022-11-15"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+setwd("C:/Users/augus/OneDrive/Documents/AU/Cultural Data Science/Rstudio codes/Final Project") # Setting working directory
+options(scipen = 999) # Choosing non scientific number notion.
+```
+
+# Collecting 
+## Installing packages
+
+```{r, eval=TRUE, echo=TRUE}
+
+
+library(ggplot2) # Visualization
+library(countrycode) # get countries information
+library(lubridate) # Date manipulation
+library(dplyr) # cleaning
+require(maps) # world map
+require(viridis) # visualization color
+library(forcats) # rearranging visualizations 
+library(gganimate) # animation
+theme_set(
+  theme_void()
+  )
+```
+
+
+## Loading Dataframes 
+
+```{r, eval=TRUE, echo=TRUE}
+covidDataRaw <- read.csv("data/WHO-COVID-19-global-data.csv") # Data from WHO collected from 2020-2022
+
+```
+# Cleaning
+
+## Adding region to countries by using countrycode package 
+
+```{r, eval=TRUE, echo=TRUE}
+covidDataRaw$region <- countrycode(sourcevar = covidDataRaw[, "Country"],
+                            origin = "country.name",
+                            destination = "region") # Adding country regions to the dataframe from package. 
+unique(covidDataRaw$region) # Using function unique to see what regions are in the package Country code
+```
+##  Manually fixing NA in region
+Some countries are spelled differently or not included in the country code package. Therefor they must be added manually.
+```{r, eval=TRUE, echo=TRUE}
+covidDataRaw$region[covidDataRaw$Country == "Saba"] <- "Latin America & Caribbean"
+covidDataRaw$region[covidDataRaw$Country == "Bonaire"] <- "Latin America & Caribbean"
+covidDataRaw$region[covidDataRaw$Country == "Mayotte"] <- "Sub-Saharan Africa"
+covidDataRaw$region[covidDataRaw$Country == "Réunion"] <- "Sub-Saharan Africa"
+covidDataRaw$region[covidDataRaw$Country == "Saint Martin"] <- "Latin America & Caribbean"
+covidDataRaw$region[covidDataRaw$Country == "Sint Eustatius"] <- "Latin America & Caribbean"
+covidDataRaw$region[covidDataRaw$Country == "Türkiye"] <- "Europe & Central Asia"
+covidDataRaw$region[covidDataRaw$Country == "Wallis and Futuna"] <- "East Asia & Pacific"
+```
+
+## Deleting Other in column country
+
+```{r, eval=TRUE, echo=TRUE}
+covidDataRaw <- covidDataRaw[- grep("Other", covidDataRaw$Country),] 
+```
+
+
+## Adding Year and month columns 
+
+```{r, eval=TRUE, echo=TRUE}
+covidDataRaw$Date_reported <- as.Date(covidDataRaw$Date_reported)
+
+covidDataRaw$Year <- as.numeric(format(covidDataRaw$Date_reported, "%Y"))
+covidDataRaw$Month <- as.numeric(format(covidDataRaw$Date_reported, "%m"))
+
+```
+## Summarizing rows in columns New_cases and New_deaths based on countries monthly data
+```{r, eval=TRUE, echo=TRUE}
+covidDataRawSum <- aggregate(cbind(New_cases, New_deaths)~Country+Month+Year+region, covidDataRaw, sum)
+
+```
+## Finding Max rows in columns Cumulative_Cases and Cumalative_deaths based on countires monthly data 
+```{r, eval=TRUE, echo=TRUE}
+covidDataRawMax <- aggregate(cbind(Cumulative_cases, Cumulative_deaths)~Country+Month+Year+region, covidDataRaw, max)
+
+```
+
+## Combining columns cumulative_cases and cumulative_deaths with dataframe covidMonth
+```{r, eval=TRUE, echo=TRUE}
+covidDataRawSum$Cumulative_cases <- covidDataRawMax$Cumulative_cases
+covidDataRawSum$Cumulative_deaths <- covidDataRawMax$Cumulative_deaths
+covidDataRawCompleted <- covidDataRawSum
+
+```
+
+
+
+## Creating worldmap
+```{r, eval=TRUE, echo=TRUE}
+world_map <- map_data("world")
+ggplot() +
+  geom_map(
+    data = world_map, map = world_map,
+    aes(x = long, y = lat, map_id = region)
+  ) 
+```
+
+
+## Worldmap df
+
+```{r, eval=TRUE, echo=TRUE}
+world <- map_data("world") #ggplot package of maps. 
+
+```
+
+
+## Dropping unsueful columns 
+
+```{r, eval=TRUE, echo=TRUE}
+worldDropped <- subset(world, select = -c(group, order, subregion) )
+
+```
+
+## Removing duplicate countries in world
+```{r, eval=TRUE, echo=TRUE}
+worldDropped <- distinct(worldDropped, region, .keep_all = TRUE)
+
+```
+
+## Exporting and fixing dataframes. 
+Here I have exported dataframe covidDataRawCompleted and worldDropped into two Excel spread sheets. Thereafter I have manually gone through the dataframe covidDataRawCompleted and change country names to match the worldDropped dataframe. The reason for doing so is to get longtitude and latitude into the dataframe covidDataRawCompleted.
+
+## Writing both dataframes as csv
+
+```{r, eval=TRUE, echo=TRUE}
+#write.csv(covidDataRawCompleted,"data/covidDataCompleted.csv", row.names = FALSE)
+#write.csv(worldDropped,"data/WorldDropped.csv", row.names = FALSE)
+```
+
+
+## Loading dataset in 
+This is the new fixed dataframe from previously stored under variable covidDataRawCompleted
+
+```{r, eval=TRUE, echo=TRUE}
+covidDataCompletedLongandLat <- read.csv("data/covidDataCompletednoLongLatRight.csv", sep = ";")
+
+```
+
+
+## Changing column names 
+Change region to area and changing country to region. The reason for doing so is to make it possiable to combine two dataframes together.
+```{r, eval=TRUE, echo=TRUE}
+covidDataCompletedLongandLat <- covidDataCompletedLongandLat%>%
+  rename(Area = region)
+covidDataCompletedLongandLat <- covidDataCompletedLongandLat%>%
+  rename(region = Country)
+
+```
+
+## Combining dataframes covidDatalongandlat and worlddropped
+
+```{r, eval=TRUE, echo=TRUE}
+covidandWorld <- merge(covidDataCompletedLongandLat, worldDropped, by = "region")
+```
+## Creating new column called date
+
+```{r, eval=TRUE, echo=TRUE}
+# Adding empty column
+covidandWorld["Date"] <- NA
+
+# Creating date from year and month
+covidandWorld <- covidandWorld %>% mutate("Date" = make_date(year = Year, month = Month))
+
+
+```
+
+# Visualising data
+## Visualising world map start of covid
+
+https://www.datanovia.com/en/blog/how-to-create-a-map-using-ggplot2/ website used for inspiration
+
+```{r, eval=TRUE, echo=TRUE}
+
+world_map <- map_data("world")
+covidStarting <- covidDataCompletedLongandLat %>%
+  filter(Month == 1 & Year == 2020)%>%
+  select(region, Cumulative_cases, Year, Month)
+  
+
+StartofCovid.map <- left_join(covidStarting, world_map, by ="region")
+
+ggplot(StartofCovid.map, aes(map_id = region, fill = Cumulative_cases))+
+  geom_map(map = StartofCovid.map, color = "white")+
+  expand_limits(x=StartofCovid.map$long, y = StartofCovid.map$lat)+
+  scale_fill_viridis_c(option="C") + 
+  theme_bw()+
+  ggtitle("1) World Start Covid")+
+  xlab("Latitude")+
+  ylab("Longitude")
+
+
+#ggsave(path = "Figures", filename = "WorldStartCovid.png")
+
+```
+## Visualising world map after covid 
+
+```{r, eval=TRUE, echo=TRUE}
+
+world_map <- map_data("world")
+covidEnding <- covidDataCompletedLongandLat %>%
+  filter(Month == 11 & Year == 2022)%>%
+  select(region, Cumulative_cases, Year, Month)
+  
+
+endofCovid.map <- left_join(covidEnding, world_map, by ="region")
+
+ggplot(endofCovid.map, aes(map_id = region, fill = Cumulative_cases))+
+  geom_map(map = endofCovid.map, color = "white")+
+  expand_limits(x=endofCovid.map$long, y = endofCovid.map$lat)+
+  scale_fill_viridis_c(option="C") + 
+  theme_bw()+
+  ggtitle("2) World End Covid")+
+  xlab("Latitude")+
+  ylab("Longitude")
+
+#ggsave(path = "Figures", filename = "WorldEndCovid.png")
+```
+
+
+
+
+## Top 20 countries based on deaths
+https://www.sharpsightlabs.com/blog/r-data-visualization-covid19-part4/
+```{r, eval=TRUE, echo=TRUE}
+covidandWorld %>%
+  filter(Year == 2022, Month == 10) %>%
+  select(region, Cumulative_deaths) %>%
+  arrange(-Cumulative_deaths)%>%
+  top_n(20) %>%
+  ggplot(aes(y = fct_reorder(region, Cumulative_deaths), x = Cumulative_deaths)) +
+  geom_bar(stat = 'identity', fill = 'darkred')+
+  theme_bw()+
+  scale_x_continuous(labels = scales::comma)+
+  ggtitle("3) Top 20 Countries Covid Deaths")+
+  xlab("Cumulative Deaths")+
+  ylab("Country")
+
+#ggsave(path = "Figures", filename = "Top20CountriesCovidDeaths.png")
+```
+
+## Top 20 countries based on cases
+http://www.sthda.com/english/wiki/ggplot2-barplots-quick-start-guide-r-software-and-data-visualization to get text
+```{r, eval=TRUE, echo=TRUE}
+covidandWorld %>%
+  filter(Year == 2022, Month == 10) %>%
+  select(region, Cumulative_cases) %>%
+  arrange(-Cumulative_cases)%>%
+  top_n(20) %>%
+  ggplot(aes(y = fct_reorder(region, Cumulative_cases), x = Cumulative_cases)) +
+    geom_bar(stat = 'identity', fill = 'orange')+
+  theme_bw()+
+  scale_x_continuous(labels = scales::comma)+
+  ggtitle("4) Top 20 Countries Covid Cases")+
+  xlab("Cumulative Cases")+
+  ylab("Country")
+
+
+#ggsave(path = "Figures", filename = "Top20CountriesCovidCases.png")
+```
+
+
+## Global cases every month for each year
+```{r, eval=TRUE, echo=TRUE}
+covidandWorld %>%
+  select(New_cases, Date, region, New_deaths) %>%
+  group_by(Date) %>% 
+  summarise(New_cases = sum(New_cases)) %>%
+  ggplot(aes( x=Date, y = New_cases))+
+  geom_line(stat="identity", color = "Orange", size = 2 ) +
+  geom_point()+
+  theme_bw() +
+  scale_y_continuous(labels = scales::comma)+
+  ggtitle("5) Global Cases Each Month")+
+  xlab("Date")+
+  ylab("Cases")
+
+
+#ggsave(path = "Figures", filename = "GlobalCasesEachMonth.png")
+
+```
+## Global deaths every month for each year
+```{r, eval=TRUE, echo=TRUE}
+covidandWorld %>%
+  select(New_cases, Date, region, New_deaths) %>%
+  group_by(Date) %>% 
+  summarise(New_deaths = sum(New_deaths)) %>%
+  ggplot(aes( x=Date, y = New_deaths))+
+  geom_line(stat="identity", color = "Darkred", size = 2 ) +
+  geom_point()+
+  theme_bw()+
+  scale_y_continuous(labels = scales::comma)+
+  ggtitle("6) Global Deaths Each Month")+
+  xlab("Date")+
+  ylab("Deaths")
+
+
+#ggsave(path = "Figures", filename = "GlobalDeathsEachMonth.png")
+  
+```
+## Animated line graph of cases 
+```{r, eval=TRUE, echo=TRUE}
+animatedCovid <- covidandWorld %>%
+  filter(region %in% c("USA", "Brazil", "India", "Russia", "Mexico", "Peru", "UK", "Italy", "Indonesia", "Germany"))
+  
+
+animatedCovid %>%
+  ggplot(aes(x = Date, y = Cumulative_deaths,  color = region)) +
+  geom_line()+
+  scale_color_viridis(discrete = TRUE)+
+  ggtitle("Top 10 countries covid-19 cases")+
+  theme_bw()+
+  scale_y_continuous(labels = scales::comma)+
+  ggtitle("7) Global Deaths Each Month Animation")+
+  xlab("Date")+
+  ylab("Deaths")+
+  transition_reveal(Date)
+
+
+#anim_save(path = "Figures", filename = "GlobalDeathsEachMonthAnimation.gif")
+```
+## New cases by Area over time
+
+```{r, eval=TRUE, echo=TRUE}
+AreaCovidCases <- covidandWorld %>%
+  group_by(Area, Date) %>%
+  summarise(Cumulative_cases = sum(Cumulative_cases))
+
+AreaCovidCases %>%
+  select(Cumulative_cases, Date, Area) %>%
+  group_by(Area) %>%
+  ggplot(aes(y = Cumulative_cases, x = Date, color = Area)) +
+  geom_line(size = 1, linetype = "solid")+
+  scale_color_viridis(discrete = TRUE)+
+  theme_bw() +
+   scale_y_continuous(labels = scales::comma)+
+  ggtitle("8) Cases by Area Each Month")+
+  xlab("Date")+
+  ylab("Cases")
+
+
+#ggsave(path = "Figures", filename = "CasesByAreaEachMonth.png")
+```
+## Deaths by Area over time
+
+```{r, eval=TRUE, echo=TRUE}
+AreaCovidDeaths <- covidandWorld %>%
+  group_by(Area, Date) %>%
+  summarise(Cumulative_deaths = sum(Cumulative_deaths))
+
+AreaCovidDeaths %>%
+  select(Cumulative_deaths, Date, Area) %>%
+  group_by(Area) %>%
+  ggplot(aes(y = Cumulative_deaths, x = Date, color = Area)) +
+  geom_line(size = 1, linetype = "solid")+
+  scale_color_viridis(discrete = TRUE)+
+  theme_bw()+
+  scale_y_continuous(labels = scales::comma)+
+  ggtitle("9) Deaths by Area Each Month")+
+  xlab("Date")+
+  ylab("Deaths")
+
+
+#ggsave(path = "Figures", filename = "DeathsByAreaEachMonth.png")
+```
